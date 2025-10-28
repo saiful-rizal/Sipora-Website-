@@ -34,6 +34,7 @@ if (!empty($user_data['username'])) {
     }
 }
 
+// Fungsi untuk menghasilkan warna background berdasarkan username
 function getInitialsBackgroundColor($username) {
     $colors = [
         '#4285F4', '#1E88E5', '#039BE5', '#00ACC1', '#00BCD4', '#26C6DA', 
@@ -48,6 +49,7 @@ function getInitialsBackgroundColor($username) {
     return $colors[$index % count($colors)];
 }
 
+// Fungsi untuk menentukan warna teks (putih atau hitam) berdasarkan warna background
 function getContrastColor($hexColor) {
     $r = hexdec(substr($hexColor, 1, 2));
     $g = hexdec(substr($hexColor, 3, 2));
@@ -58,11 +60,13 @@ function getContrastColor($hexColor) {
     return $luminance > 0.5 ? '#000000' : '#FFFFFF';
 }
 
+// Fungsi untuk memeriksa apakah pengguna memiliki foto profil
 function hasProfilePhoto($user_id) {
     $photo_path = __DIR__ . '/uploads/profile_photos/' . $user_id . '.jpg';
     return file_exists($photo_path);
 }
 
+// Fungsi untuk mendapatkan URL foto profil
 function getProfilePhotoUrl($user_id, $email, $username) {
     $photo_path = __DIR__ . '/uploads/profile_photos/' . $user_id . '.jpg';
     if (file_exists($photo_path)) {
@@ -72,6 +76,7 @@ function getProfilePhotoUrl($user_id, $email, $username) {
     }
 }
 
+// Fungsi untuk mendapatkan inisial dengan desain yang bagus
 function getInitialsHtml($username, $size = 'normal') {
     $username_parts = explode('_', $username);
     if (count($username_parts) > 1) {
@@ -105,76 +110,13 @@ function getInitialsHtml($username, $size = 'normal') {
     return "<div class='user-initials {$sizeClass}' style='background-color: {$bgColor}; color: {$textColor}; {$style}'>{$initials}</div>";
 }
 
-try {
-    $stats_data = [
-        'total_users' => $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn(),
-        'total_books' => $pdo->query("SELECT COUNT(*) FROM dokumen WHERE tipe_dokumen = 'book'")->fetchColumn(),
-        'total_journals' => $pdo->query("SELECT COUNT(*) FROM dokumen WHERE tipe_dokumen = 'journal'")->fetchColumn(),
-        'total_theses' => $pdo->query("SELECT COUNT(*) FROM dokumen WHERE tipe_dokumen = 'thesis'")->fetchColumn(),
-        'total_archives' => $pdo->query("SELECT COUNT(*) FROM dokumen")->fetchColumn()
-    ];
-} catch (PDOException $e) {
-    $stats_data = [
-        'total_users' => 0,
-        'total_books' => 0,
-        'total_journals' => 0,
-        'total_theses' => 0,
-        'total_archives' => 0
-    ];
-}
-
-try {
-    $jurusan_data = $pdo->query("SELECT id_jurusan, nama_jurusan FROM master_jurusan ORDER BY nama_jurusan")->fetchAll(PDO::FETCH_ASSOC);
-    $prodi_data = $pdo->query("SELECT id_prodi, nama_prodi FROM master_prodi ORDER BY nama_prodi")->fetchAll(PDO::FETCH_ASSOC);
-    $tahun_data = $pdo->query("SELECT DISTINCT year_id FROM dokumen ORDER BY year_id DESC")->fetchAll(PDO::FETCH_COLUMN);
-} catch (PDOException $e) {
-    $jurusan_data = [];
-    $prodi_data = [];
-    $tahun_data = [];
-}
-
- $filter_jurusan = isset($_GET['filter_jurusan']) ? $_GET['filter_jurusan'] : '';
- $filter_prodi = isset($_GET['filter_prodi']) ? $_GET['filter_prodi'] : '';
- $filter_tahun = isset($_GET['filter_tahun']) ? $_GET['filter_tahun'] : '';
-
- $query = "
- SELECT 
-     d.dokumen_id AS id_book, 
-     d.judul AS title, 
-     d.tipe_dokumen AS type,
-     d.abstrak AS abstract,
-     (SELECT nama_jurusan FROM master_jurusan WHERE id_jurusan = d.id_jurusan) AS department,
-     (SELECT nama_prodi FROM master_prodi WHERE id_prodi = d.id_prodi) AS prodi,
-     d.year_id AS year,
-     d.file_path AS file_path,
-     d.tgl_unggah AS upload_date,
-     d.status_id AS status_id
- FROM dokumen d
- WHERE 1=1
-";
-
- $params = [];
-if (!empty($filter_jurusan)) {
-    $query .= " AND d.id_jurusan = :jurusan";
-    $params['jurusan'] = $filter_jurusan;
-}
-if (!empty($filter_prodi)) {
-    $query .= " AND d.id_prodi = :prodi";
-    $params['prodi'] = $filter_prodi;
-}
-if (!empty($filter_tahun)) {
-    $query .= " AND d.year_id = :tahun";
-    $params['tahun'] = $filter_tahun;
-}
-
- $query .= " ORDER BY d.tgl_unggah DESC LIMIT 10";
-
-try {
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-    $documents_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $documents_data = [];
+function getRoleName($role_id) {
+    switch($role_id) {
+        case 1: return 'Admin';
+        case 2: return 'Mahasiswa';
+        case 3: return 'Dosen';
+        default: return 'Pengguna';
+    }
 }
 
 try {
@@ -194,43 +136,27 @@ try {
     $profile_data = [];
 }
 
-function getStatusBadge($status_id) {
-    switch($status_id) {
-        case 1: return 'badge-success';
-        case 2: return 'badge-warning';
-        case 3: return 'badge-info';
-        default: return 'badge-secondary';
-    }
-}
-
-function getStatusName($status_id) {
-    switch($status_id) {
-        case 1: return 'Diterbitkan';
-        case 2: return 'Review';
-        case 3: return 'Draft';
-        default: return 'Unknown';
-    }
-}
-
-function getDocumentTypeName($type) {
-    switch($type) {
-        case 'book': return 'Buku';
-        case 'journal': return 'Jurnal';
-        case 'thesis': return 'Tesis';
-        case 'final_project': return 'Tugas Akhir';
-        case 'research': return 'Penelitian';
-        case 'ebook': return 'E-Book';
-        default: return 'Lainnya';
-    }
-}
-
-function getRoleName($role_id) {
-    switch($role_id) {
-        case 1: return 'Admin';
-        case 2: return 'Mahasiswa';
-        case 3: return 'Dosen';
-        default: return 'Pengguna';
-    }
+// Get notifications
+try {
+    $stmt = $pdo->prepare("
+        SELECT * FROM notifications 
+        WHERE user_id = :user_id 
+        ORDER BY created_at DESC 
+        LIMIT 5
+    ");
+    $stmt->execute(['user_id' => $user_id]);
+    $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Count unread notifications
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) as count FROM notifications 
+        WHERE user_id = :user_id AND is_read = 0
+    ");
+    $stmt->execute(['user_id' => $user_id]);
+    $unread_count = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
+} catch (PDOException $e) {
+    $notifications = [];
+    $unread_count = 0;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
@@ -312,26 +238,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_photo'])) {
             } elseif ($fileSize > 2097152) {
                 $photo_error = "Ukuran file maksimal 2MB";
             } else {
+                // Create directory if it doesn't exist
                 $uploadDir = __DIR__ . '/uploads/profile_photos/';
                 if (!file_exists($uploadDir)) {
                     mkdir($uploadDir, 0755, true);
                 }
                 
+                // Convert to JPG and save
                 $targetPath = $uploadDir . $user_id . '.jpg';
                 
                 if ($fileExtension === 'jpg' || $fileExtension === 'jpeg') {
+                    // Move the file directly
                     move_uploaded_file($fileTmpName, $targetPath);
                 } else {
+                    // Convert PNG/GIF to JPG
                     if ($fileExtension === 'png') {
                         $image = imagecreatefrompng($fileTmpName);
                     } else {
                         $image = imagecreatefromgif($fileTmpName);
                     }
                     
+                    // Create a white background
                     $bg = imagecreatetruecolor(imagesx($image), imagesy($image));
                     imagefill($bg, 0, 0, imagecolorallocate($bg, 255, 255, 255));
                     imagecopy($bg, $image, 0, 0, 0, 0, imagesx($image), imagesy($image));
                     
+                    // Save as JPG
                     imagejpeg($bg, $targetPath, 90);
                     imagedestroy($image);
                     imagedestroy($bg);
@@ -378,20 +310,196 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
         $password_error = "Error updating password: " . $e->getMessage();
     }
 }
+
+function handleFileUpload($file, $target_dir = "uploads/documents/") {
+    if (!file_exists($target_dir)) {
+        mkdir($target_dir, 0777, true);
+    }
+    
+    $file_extension = pathinfo($file["name"], PATHINFO_EXTENSION);
+    $new_filename = uniqid() . '.' . $file_extension;
+    $target_file = $target_dir . $new_filename;
+    
+    if ($file["size"] > 10000000) {
+        return ["success" => false, "message" => "File terlalu besar, maksimal 10MB"];
+    }
+    
+    $allowed_types = ["pdf", "doc", "docx", "jpg", "jpeg", "png"];
+    if (!in_array(strtolower($file_extension), $allowed_types)) {
+        return ["success" => false, "message" => "Tipe file tidak didukung"];
+    }
+    
+    if (move_uploaded_file($file["tmp_name"], $target_file)) {
+        return [
+            "success" => true, 
+            "file_path" => $target_file, 
+            "file_size" => $file["size"],
+            "original_name" => $file["name"]
+        ];
+    } else {
+        return ["success" => false, "message" => "Gagal mengunggah file"];
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload') {
+    $tipe_dokumen = htmlspecialchars($_POST['tipe_dokumen']);
+    $judul = htmlspecialchars($_POST['judul']);
+    $abstrak = htmlspecialchars($_POST['abstrak']);
+    $id_tema = htmlspecialchars($_POST['id_tema']);
+    $id_jurusan = htmlspecialchars($_POST['id_jurusan']);
+    $id_prodi = htmlspecialchars($_POST['id_prodi']);
+    $year_id = htmlspecialchars($_POST['year_id']);
+    $status_id = htmlspecialchars($_POST['status_id']);
+    $format_id = htmlspecialchars($_POST['format_id']);
+    $policy_id = htmlspecialchars($_POST['policy_id']);
+    
+    // Get authors and keywords
+    $authors = isset($_POST['authors']) ? $_POST['authors'] : [];
+    $keywords = isset($_POST['keywords']) ? $_POST['keywords'] : [];
+    
+    $response = ['success' => false, 'message' => 'Terjadi kesalahan.'];
+    
+    if (!empty($tipe_dokumen) && !empty($judul) && !empty($id_tema) && !empty($id_jurusan) && !empty($id_prodi) && !empty($year_id) && !empty($status_id) && !empty($format_id) && !empty($policy_id)) {
+        if (isset($_FILES['dokumen_file']) && $_FILES['dokumen_file']['error'] == 0) {
+            $file_result = handleFileUpload($_FILES['dokumen_file']);
+            
+            if ($file_result['success']) {
+                try {
+                    $stmt = $pdo->prepare("INSERT INTO dokumen 
+    (tipe_dokumen, judul, abstrak, file_path, file_size, uploader_id, id_tema, id_jurusan, id_prodi, year_id, status_id, format_id, policy_id) 
+    VALUES 
+    (:tipe_dokumen, :judul, :abstrak, :file_path, :file_size, :uploader_id, :id_tema, :id_jurusan, :id_prodi, :year_id, :status_id, :format_id, :policy_id)");
+
+                    $stmt->execute([
+                        'tipe_dokumen' => $tipe_dokumen,
+                        'judul' => $judul,
+                        'abstrak' => $abstrak,
+                        'file_path' => $file_result['file_path'],
+                        'file_size' => $file_result['file_size'],
+                        'uploader_id' => $user_id,
+                        'id_tema' => $id_tema,
+                        'id_jurusan' => $id_jurusan,
+                        'id_prodi' => $id_prodi,
+                        'year_id' => $year_id,
+                        'status_id' => $status_id,
+                        'format_id' => $format_id,
+                        'policy_id' => $policy_id
+                    ]);
+
+                    $dokumen_id = $pdo->lastInsertId();
+                    
+                    // Add authors
+                    if (!empty($authors)) {
+                        foreach ($authors as $author) {
+                            if (!empty(trim($author))) {
+                                $stmt = $pdo->prepare("INSERT INTO dokumen_authors (dokumen_id, author_name) VALUES (:dokumen_id, :author_name)");
+                                $stmt->execute([
+                                    'dokumen_id' => $dokumen_id,
+                                    'author_name' => trim($author)
+                                ]);
+                            }
+                        }
+                    }
+                    
+                    // Add keywords
+                    if (!empty($keywords)) {
+                        foreach ($keywords as $keyword) {
+                            if (!empty(trim($keyword))) {
+                                $stmt = $pdo->prepare("INSERT INTO dokumen_keywords (dokumen_id, keyword) VALUES (:dokumen_id, :keyword)");
+                                $stmt->execute([
+                                    'dokumen_id' => $dokumen_id,
+                                    'keyword' => trim($keyword)
+                                ]);
+                            }
+                        }
+                    }
+                    
+                    // Add notification for admins
+                    $stmt = $pdo->prepare("
+                        INSERT INTO notifications (user_id, title, message, type, related_id) 
+                        SELECT id_user, 'Dokumen Baru', :message, 'document', :dokumen_id 
+                        FROM users WHERE role_id = 1
+                    ");
+                    $stmt->execute([
+                        'message' => "Dokumen '{$judul}' telah diunggah dan menunggu verifikasi.",
+                        'dokumen_id' => $dokumen_id
+                    ]);
+                    
+                    // Add notification for uploader
+                    $stmt = $pdo->prepare("
+                        INSERT INTO notifications (user_id, title, message, type, related_id) 
+                        VALUES (:user_id, 'Upload Berhasil', :message, 'document', :dokumen_id)
+                    ");
+                    $stmt->execute([
+                        'user_id' => $user_id,
+                        'message' => "Dokumen '{$judul}' telah berhasil diunggah dan sedang dalam proses verifikasi.",
+                        'dokumen_id' => $dokumen_id
+                    ]);
+
+                    $response['success'] = true;
+                    $response['message'] = 'Dokumen berhasil diunggah!';
+                    $response['redirect'] = 'dashboard.php';
+
+                } catch (PDOException $e) {
+                    $response['message'] = 'Kesalahan database: ' . $e->getMessage();
+                }
+            } else {
+                $response['message'] = $file_result['message'];
+            }
+        } else {
+            $response['message'] = 'File tidak dipilih atau ada kesalahan saat mengunggah.';
+        }
+    } else {
+        $response['message'] = 'Semua field yang ditandai * harus diisi!';
+    }
+    
+    echo json_encode($response);
+    exit();
+}
+
+// Mark notification as read
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_notification_read'])) {
+    $notification_id = $_POST['notification_id'];
+    
+    try {
+        $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE id = :id AND user_id = :user_id");
+        $stmt->execute(['id' => $notification_id, 'user_id' => $user_id]);
+        
+        echo json_encode(['success' => true]);
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit();
+}
+
+// Mark all notifications as read
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_all_read'])) {
+    try {
+        $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = :user_id");
+        $stmt->execute(['user_id' => $user_id]);
+        
+        echo json_encode(['success' => true]);
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit();
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SIPORA | Beranda</title>
+  <title>SIPORA | Upload Dokumen</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    /* --- Global Variables & Styles --- */
     :root {
       --primary-blue: #0058e4;
       --primary-light: #e9f0ff;
-      --light-blue: #64B5F6;
+      --light-blue: #64B5F6; /* Biru muda untuk user initials */
       --background-page: #f5f7fa;
       --white: #ffffff;
       --text-primary: #222222;
@@ -400,6 +508,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       --border-color: #dcdcdc;
       --shadow-sm: 0 2px 8px rgba(0,0,0,0.05);
       --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --primary-hover: #0044b3;
+      --warning-bg: #fff3cd;
+      --warning-border: #ffeeba;
+      --warning-text: #856404;
+      --light-gray-bg: #f5f7fa;
+      --success-bg: #d4edda;
+      --success-border: #c3e6cb;
+      --success-text: #155724;
+      --error-bg: #f8d7da;
+      --error-border: #f5c6cb;
+      --error-text: #721c24;
     }
 
     * {
@@ -415,6 +534,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       position: relative;
     }
 
+    /* --- User Initials Styles --- */
     .user-initials {
       border-radius: 50%;
       display: flex;
@@ -425,6 +545,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       letter-spacing: 1px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       transition: transform 0.2s ease;
+      /* Default biru muda jika tidak ada warna khusus */
       background-color: var(--light-blue);
       color: white;
     }
@@ -442,6 +563,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       text-transform: uppercase;
       letter-spacing: 0.5px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      /* Default biru muda jika tidak ada warna khusus */
       background-color: var(--light-blue);
       color: white;
     }
@@ -455,10 +577,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       text-transform: uppercase;
       letter-spacing: 2px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+      /* Default biru muda jika tidak ada warna khusus */
       background-color: var(--light-blue);
       color: white;
     }
 
+    /* --- Subtle Background Animation --- */
     .bg-animation {
       position: fixed;
       top: 0;
@@ -513,6 +637,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       }
     }
 
+   /* --- Navigation --- */
     nav {
       background-color: var(--white);
       box-shadow: 0 2px 6px rgba(0,0,0,0.08);
@@ -591,6 +716,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       transform: scale(1.05);
     }
 
+    /* Mobile menu button */
     .mobile-menu-btn {
       display: none;
       background: none;
@@ -600,93 +726,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       cursor: pointer;
     }
 
-    .user-dropdown {
-      position: absolute;
-      top: 100%;
-      right: 0;
-      margin-top: 10px;
-      background-color: var(--white);
-      border-radius: 8px;
-      box-shadow: var(--shadow-md);
-      min-width: 200px;
-      z-index: 1001;
-      display: none;
-      overflow: hidden;
-    }
-    
-    .user-dropdown.active {
-      display: block;
-      animation: fadeIn 0.2s ease;
-    }
-    
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .user-dropdown-header {
-      padding: 12px 15px;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    
-    .user-dropdown-header img, .user-dropdown-header .user-initials {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-    
-    .user-dropdown-header div {
-      display: flex;
-      flex-direction: column;
-    }
-    
-    .user-dropdown-header .name {
-      font-weight: 600;
-      font-size: 14px;
-    }
-    
-    .user-dropdown-header .role {
-      font-size: 12px;
-      color: var(--text-secondary);
-    }
-    
-    .user-dropdown-item {
-      padding: 10px 15px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-      color: var(--text-primary);
-      transition: background-color 0.2s ease;
-    }
-    
-    .user-dropdown-item:hover {
-      background-color: #f8f9fa;
-    }
-    
-    .user-dropdown-item i {
-      font-size: 16px;
-      color: var(--text-secondary);
-    }
-    
-    .user-dropdown-divider {
-      height: 1px;
-      background-color: var(--border-color);
-      margin: 5px 0;
-    }
-    
-    .user-dropdown-logout {
-      color: #dc3545;
-    }
-    
-    .user-dropdown-logout i {
-      color: #dc3545;
-    }
-
+    /* --- Notification Icon --- */
     .notification-icon {
       position: relative;
       cursor: pointer;
@@ -858,6 +898,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       text-decoration: none;
     }
 
+    /* --- User Dropdown --- */
+    .user-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 10px;
+      background-color: var(--white);
+      border-radius: 8px;
+      box-shadow: var(--shadow-md);
+      min-width: 200px;
+      z-index: 1001;
+      display: none;
+      overflow: hidden;
+    }
+    
+    .user-dropdown.active {
+      display: block;
+      animation: fadeIn 0.2s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .user-dropdown-header {
+      padding: 12px 15px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .user-dropdown-header img, .user-dropdown-header .user-initials {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    
+    .user-dropdown-header div {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .user-dropdown-header .name {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    .user-dropdown-header .role {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    
+    .user-dropdown-item {
+      padding: 10px 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-primary);
+      transition: background-color 0.2s ease;
+    }
+    
+    .user-dropdown-item:hover {
+      background-color: #f8f9fa;
+    }
+    
+    .user-dropdown-item i {
+      font-size: 16px;
+      color: var(--text-secondary);
+    }
+    
+    .user-dropdown-divider {
+      height: 1px;
+      background-color: var(--border-color);
+      margin: 5px 0;
+    }
+    
+    .user-dropdown-logout {
+      color: #dc3545;
+    }
+    
+    .user-dropdown-logout i {
+      color: #dc3545;
+    }
+
+    /* --- Modal --- */
     .modal {
       display: none;
       position: fixed;
@@ -1039,6 +1168,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       color: var(--text-primary);
     }
 
+    /* --- Badge Styles --- */
+    .badge {
+      font-size: 12.5px;
+      padding: 6px 11px;
+      border-radius: 6px;
+      margin-right: 6px;
+      font-weight: 500;
+    }
+    .badge-success { background: #d1f7c4; color: #2e7d32; }
+    .badge-info { background: #cce5ff; color: #004085; }
+    .badge-warning { background: #fff3cd; color: #856404; }
+    .badge-danger { background: #f8d7da; color: #721c24; }
+    .badge-secondary { background: #e9ecef; color: #495057; }
+
     .modal-footer {
       padding: 15px 20px;
       border-top: 1px solid var(--border-color);
@@ -1084,6 +1227,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       background-color: #c82333;
     }
 
+    /* --- Edit Profile Form --- */
     .edit-profile-form {
       display: none;
     }
@@ -1117,6 +1261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       box-shadow: 0 0 0 3px rgba(0, 88, 228, 0.15);
     }
 
+    /* --- Photo Upload --- */
     .photo-upload-container {
       margin-bottom: 20px;
     }
@@ -1168,6 +1313,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       box-shadow: var(--shadow-sm);
     }
 
+    /* --- Settings Modal --- */
     .settings-tabs {
       display: flex;
       border-bottom: 1px solid var(--border-color);
@@ -1276,6 +1422,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       font-size: 14px;
     }
 
+    /* --- Password Change Form --- */
     .password-form {
       display: none;
     }
@@ -1284,6 +1431,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       display: block;
     }
 
+    /* --- Notification --- */
     .notification {
       position: fixed;
       top: 20px;
@@ -1341,337 +1489,235 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       color: var(--text-secondary);
     }
 
-    .header {
-      max-width: 1200px;
-      margin: 32px auto;
-      background: linear-gradient(90deg, #0040c9, #00b6ff);
-      border-radius: 14px;
-      color: var(--white);
-      padding: 32px 40px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.12);
-    }
-    
-    .header h3 {
-      font-weight: 600;
-      font-size: 20px;
-      margin-bottom: 10px;
-    }
-    
-    .header small {
-      font-size: 14.6px;
-      opacity: 0.95;
-    }
-    
-    .header img, .header .user-initials {
-      width: 68px;
-      height: 68px;
-      border-radius: 50%;
-      border: 2px solid var(--white);
-      object-fit: cover;
-    }
-
-    .search-box {
-      max-width: 1200px;
-      margin: 26px auto;
-      padding: 0 20px;
-    }
-    
-    .search-box input {
-      width: 100%;
-      padding: 14px 18px;
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      font-size: 14.8px;
-      outline: none;
-      background-color: var(--white);
-      transition: all 0.2s ease;
-    }
-    
-    .search-box input:focus {
-      border-color: var(--primary-blue);
-      box-shadow: 0 0 0 3px rgba(0, 88, 228, 0.15);
-    }
-
-    .stats {
-      max-width: 1200px;
-      margin: 30px auto;
-      padding: 0 20px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 24px;
-    }
-    
-    .stat-card {
-      background-color: var(--white);
-      border-radius: 12px;
-      padding: 26px 22px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: var(--shadow-sm);
-      transition: transform 0.25s ease, box-shadow 0.25s ease;
-    }
-    
-    .stat-card:hover {
-      transform: translateY(-3px);
-      box-shadow: var(--shadow-md);
-    }
-    
-    .stat-card i {
-      font-size: 30px;
-      background-color: var(--primary-light);
-      color: var(--primary-blue);
-      padding: 10px;
-      border-radius: 10px;
-    }
-    
-    .stat-card h4 {
-      font-weight: 700;
-      color: var(--text-primary);
-      font-size: 21px;
-      margin: 0;
-    }
-    
-    .stat-card p {
-      margin-top: 5px;
-      color: var(--text-secondary);
-      font-size: 14.4px;
-    }
-
+    /* Section Header */
     .section-header {
-      max-width: 1200px;
-      margin: 45px auto 16px;
+      max-width: 1100px;
+      margin: 40px auto 20px;
       padding: 0 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
     
-    .section-header h5 {
+    .section-header h2 {
+      font-size: 24px;
       font-weight: 600;
       color: var(--text-primary);
-      font-size: 17px;
-    }
-    
-    .section-header a {
-      text-decoration: none;
-      color: var(--primary-blue);
-      font-weight: 500;
-      font-size: 14.5px;
     }
 
-    .filter-section {
-      max-width: 1200px;
-      margin: 0 auto 20px;
-      padding: 0 20px;
+    /* Upload Form Container */
+    .upload-container {
+      max-width: 1100px;
+      margin: 0 auto 40px;
+      padding: 40px;
       background-color: var(--white);
       border-radius: 12px;
       box-shadow: var(--shadow-sm);
-      padding: 20px;
     }
-    
-    .filter-title {
-      font-weight: 600;
-      font-size: 16px;
-      margin-bottom: 15px;
-      color: var(--text-primary);
+
+    .form-group {
+      margin-bottom: 20px;
     }
-    
-    .filter-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 15px;
-    }
-    
-    .filter-group {
-      flex: 1;
-      min-width: 200px;
-    }
-    
-    .filter-label {
+
+    .form-group label {
       display: block;
       font-weight: 500;
       margin-bottom: 8px;
-      color: var(--text-secondary);
-      font-size: 14px;
+      color: var(--text-primary);
     }
-    
-    .filter-select {
+
+    .form-group label .required {
+      color: #dc3545;
+    }
+
+    .form-control {
       width: 100%;
-      padding: 10px 15px;
+      padding: 12px 15px;
       border: 1px solid var(--border-color);
       border-radius: 8px;
-      font-size: 14px;
-      background-color: var(--white);
+      font-size: 15px;
       transition: border-color 0.3s, box-shadow 0.3s;
     }
-    
-    .filter-select:focus {
+
+    .form-control:focus {
       outline: none;
       border-color: var(--primary-blue);
       box-shadow: 0 0 0 3px rgba(0, 88, 228, 0.15);
     }
-    
-    .filter-actions {
-      display: flex;
-      align-items: flex-end;
-      gap: 10px;
-    }
-    
-    .btn-filter {
-      background-color: var(--primary-blue);
-      color: var(--white);
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-    
-    .btn-filter:hover {
-      background-color: #0044b3;
-    }
-    
-    .btn-reset {
-      background-color: #e9ecef;
-      color: var(--text-primary);
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-    
-    .btn-reset:hover {
-      background-color: #dee2e6;
+
+    textarea.form-control {
+      resize: vertical;
+      min-height: 100px;
     }
 
-    .document-card {
-      max-width: 1200px;
-      background-color: var(--white);
-      border-radius: 12px;
-      padding: 25px 28px;
-      margin: 0 auto 20px;
-      box-shadow: var(--shadow-sm);
-      transition: transform 0.25s ease, box-shadow 0.25s ease;
-    }
-    
-    .document-card:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
-    }
-    
-    .badge {
-      font-size: 12.5px;
-      padding: 6px 11px;
-      border-radius: 6px;
-      margin-right: 6px;
-      font-weight: 500;
-    }
-    .badge-success { background: #d1f7c4; color: #2e7d32; }
-    .badge-info { background: #cce5ff; color: #004085; }
-    .badge-warning { background: #fff3cd; color: #856404; }
-    .badge-danger { background: #f8d7da; color: #721c24; }
-    
-    .document-card h6 {
-      font-weight: 600;
-      margin: 12px 0 10px;
-      line-height: 1.55;
-      color: var(--text-primary);
-      font-size: 15.5px;
-    }
-    
-    .document-card p {
-      font-size: 14.3px;
-      color: var(--text-secondary);
-      margin-bottom: 14px;
-      line-height: 1.65;
-    }
-    
-    .doc-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 13.4px;
-      color: var(--text-muted);
-      margin-top: 6px;
-    }
-    
-    .doc-footer small i {
-      margin-right: 5px;
-    }
-    
-    .btn-download {
-      background-color: var(--primary-blue);
-      color: var(--white);
-      border: none;
-      padding: 7px 15px;
-      border-radius: 7px;
-      cursor: pointer;
-      transition: background-color 0.25s ease;
-      font-size: 13.2px;
-      font-weight: 500;
-    }
-    
-    .btn-download:hover {
-      background-color: #0044b3;
-    }
-
-    .empty-state {
-      max-width: 1200px;
-      margin: 0 auto 20px;
-      padding: 0 20px;
-    }
-    
-    .empty-state-card {
-      background-color: var(--white);
-      border-radius: 12px;
-      padding: 40px 30px;
-      text-align: center;
-      box-shadow: var(--shadow-sm);
-    }
-    
-    .empty-state-icon {
-      font-size: 64px;
-      color: var(--primary-light);
-      margin-bottom: 20px;
-    }
-    
-    .empty-state-title {
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--text-primary);
+    /* Dynamic Fields (Authors & Keywords) */
+    .dynamic-field-container {
       margin-bottom: 10px;
     }
     
-    .empty-state-description {
-      font-size: 16px;
-      color: var(--text-secondary);
-      margin-bottom: 20px;
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
     }
-    
-    .empty-state-action {
+
+    .input-group .form-control {
+      flex-grow: 1;
+    }
+
+    .btn-remove {
+      padding: 0 12px;
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      transition: background-color 0.2s;
+    }
+    .btn-remove:hover {
+      background-color: #c82333;
+    }
+
+    .btn-add {
+      background: none;
+      border: none;
+      color: var(--primary-blue);
+      font-weight: 500;
+      cursor: pointer;
+      padding: 5px 0;
+      font-size: 15px;
+    }
+    .btn-add:hover {
+      text-decoration: underline;
+    }
+    .btn-add i {
+      margin-right: 5px;
+    }
+
+    /* File Upload Area */
+    .file-upload-area {
+      border: 2px dashed var(--border-color);
+      border-radius: 8px;
+      padding: 30px;
+      text-align: center;
+      background-color: #fafafa;
+      transition: border-color 0.3s;
+    }
+    .file-upload-area.dragover {
+      border-color: var(--primary-blue);
+      background-color: rgba(0, 88, 228, 0.05);
+    }
+
+    .file-upload-area input[type="file"] {
+      display: none;
+    }
+
+    .file-upload-label {
       display: inline-block;
       padding: 10px 20px;
-      background-color: var(--primary-blue);
-      color: var(--white);
-      border-radius: 8px;
-      text-decoration: none;
+      background-color: #e9ecef;
+      color: var(--text-primary);
+      border-radius: 6px;
+      cursor: pointer;
       font-weight: 500;
       transition: background-color 0.3s;
     }
-    
-    .empty-state-action:hover {
-      background-color: #0044b3;
+    .file-upload-label:hover {
+      background-color: #dee2e6;
     }
 
+    .file-name-display {
+      margin-top: 15px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    /* Alert Box */
+    .alert {
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-bottom: 25px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .alert-warning {
+      background-color: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+      color: var(--warning-text);
+    }
+
+    .alert-success {
+      background-color: var(--success-bg);
+      border: 1px solid var(--success-border);
+      color: var(--success-text);
+    }
+
+    .alert-error {
+      background-color: var(--error-bg);
+      border: 1px solid var(--error-border);
+      color: var(--error-text);
+    }
+
+    .alert i {
+      font-size: 20px;
+      margin-top: 2px;
+    }
+
+    /* Submit Button */
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      background-color: var(--primary-blue);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    .btn-submit:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-submit:disabled {
+      background-color: #6c757d;
+      cursor: not-allowed;
+    }
+
+    /* Progress Bar */
+    .progress-container {
+      margin-top: 20px;
+      display: none;
+    }
+
+    .progress-bar {
+      height: 6px;
+      background-color: #e9ecef;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background-color: var(--primary-blue);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .progress-text {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* --- Footer --- */
     footer {
       text-align: center;
       color: #777;
@@ -1681,35 +1727,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       border-top: 1px solid #ddd;
     }
 
+    /* --- Responsive Design --- */
     @media (max-width: 992px) {
-      .header {
-        padding: 25px 30px;
-      }
-      
-      .header h3 {
-        font-size: 18px;
-      }
-      
-      .header small {
-        font-size: 13px;
-      }
-      
-      .header img, .header .user-initials {
-        width: 60px;
-        height: 60px;
-      }
-      
-      .stats {
-        grid-template-columns: repeat(2, 1fr);
-      }
-      
-      .filter-container {
-        flex-direction: column;
-      }
-      
-      .filter-actions {
-        justify-content: flex-start;
-        margin-top: 10px;
+      .upload-container {
+        padding: 30px;
       }
     }
 
@@ -1743,45 +1764,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
         display: none;
       }
       
-      .header {
-        flex-direction: column;
-        text-align: center;
-        padding: 25px 20px;
-      }
-      
-      .header div {
-        margin-bottom: 15px;
-      }
-      
-      .stats {
-        grid-template-columns: 1fr;
-        gap: 15px;
-      }
-      
-      .stat-card {
-        padding: 20px 15px;
+      .upload-container {
+        padding: 20px;
       }
       
       .section-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
-      }
-      
-      .document-card {
-        padding: 20px;
-      }
-      
-      .doc-footer {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-      }
-      
-      .doc-footer div {
-        display: flex;
-        justify-content: space-between;
-        width: 100%;
       }
     }
 
@@ -1798,49 +1788,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
         font-size: 14px;
       }
       
-      .header {
-        margin: 20px 15px;
-        padding: 20px 15px;
-      }
-      
-      .header h3 {
-        font-size: 16px;
-      }
-      
-      .header small {
-        font-size: 12px;
-      }
-      
-      .header img, .header .user-initials {
-        width: 50px;
-        height: 50px;
-      }
-      
-      .search-box {
-        margin: 20px 15px;
-        padding: 0;
-      }
-      
-      .stats {
-        margin: 20px 15px;
-        padding: 0;
-      }
-      
-      .stat-card {
+      .upload-container {
+        margin: 0 15px 40px;
         padding: 15px;
-      }
-      
-      .stat-card i {
-        font-size: 24px;
-        padding: 8px;
-      }
-      
-      .stat-card h4 {
-        font-size: 18px;
-      }
-      
-      .stat-card p {
-        font-size: 13px;
       }
       
       .section-header {
@@ -1848,50 +1798,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
         padding: 0;
       }
       
-      .section-header h5 {
-        font-size: 16px;
-      }
-      
-      .filter-section {
-        margin: 0 15px 15px;
-        padding: 15px;
-      }
-      
-      .filter-group {
-        min-width: 100%;
-      }
-      
-      .document-card {
-        margin: 0 15px 15px;
-        padding: 15px;
-      }
-      
-      .document-card h6 {
-        font-size: 14px;
-      }
-      
-      .document-card p {
-        font-size: 13px;
-      }
-      
-      .doc-footer {
-        font-size: 12px;
-      }
-      
-      .btn-download {
-        padding: 6px 12px;
-        font-size: 12px;
-      }
-      
-      footer {
-        margin-top: 40px;
-        padding: 20px 15px;
-        font-size: 0.85rem;
+      .section-header h2 {
+        font-size: 20px;
       }
     }
   </style>
 </head>
 <body>
+  <!-- Subtle Background Animation -->
   <div class="bg-animation">
     <div class="bg-circle"></div>
     <div class="bg-circle"></div>
@@ -1908,18 +1822,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
         <i class="bi bi-list"></i>
       </button>
       <div class="nav-links" id="navLinks">
-        <a href="dashboard.php" class="active">Beranda</a>
-        <a href="upload.php">Upload</a>
+        <a href="dashboard.php">Beranda</a>
+        <a href="#" class="active">Upload</a>
         <a href="browser.php">Browser</a>
-        <a href="search.php">Search</a>
-        <a href="download.php">Download</a>
+        <a href="#">Search</a>
+        <a href="#">Download</a>
       </div>
       <div class="user-info">
         <span><?php echo htmlspecialchars($user_data['username']); ?></span>
         
+        <!-- Notification Icon -->
         <div class="notification-icon" id="notificationIcon">
           <i class="bi bi-bell-fill"></i>
-          <span class="notification-badge">3</span>
+          <?php if ($unread_count > 0): ?>
+            <span class="notification-badge"><?php echo $unread_count; ?></span>
+          <?php endif; ?>
           
           <div class="notification-dropdown" id="notificationDropdown">
             <div class="notification-header">
@@ -1927,63 +1844,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
               <a href="#" onclick="markAllAsRead()">Tandai semua dibaca</a>
             </div>
             <div class="notification-list">
-              <div class="notification-item unread">
-                <div class="notification-content">
-                  <div class="notification-icon-wrapper info">
-                    <i class="bi bi-info-circle"></i>
-                  </div>
-                  <div class="notification-text">
-                    <div class="notification-title">Dokumen Baru</div>
-                    <div class="notification-message">Dokumen "Analisis Data dengan Machine Learning" telah ditambahkan ke repository.</div>
-                    <div class="notification-time">2 jam yang lalu</div>
+              <?php if (empty($notifications)): ?>
+                <div class="notification-item">
+                  <div class="notification-content">
+                    <div class="notification-text">
+                      <div class="notification-title">Tidak Ada Notifikasi</div>
+                      <div class="notification-message">Anda tidak memiliki notifikasi saat ini.</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div class="notification-item unread">
-                <div class="notification-content">
-                  <div class="notification-icon-wrapper success">
-                    <i class="bi bi-check-circle"></i>
+              <?php else: ?>
+                <?php foreach ($notifications as $notification): ?>
+                  <div class="notification-item <?php echo $notification['is_read'] == 0 ? 'unread' : ''; ?>" data-id="<?php echo $notification['id']; ?>">
+                    <div class="notification-content">
+                      <div class="notification-icon-wrapper <?php echo $notification['type']; ?>">
+                        <?php if ($notification['type'] == 'info'): ?>
+                          <i class="bi bi-info-circle"></i>
+                        <?php elseif ($notification['type'] == 'success'): ?>
+                          <i class="bi bi-check-circle"></i>
+                        <?php elseif ($notification['type'] == 'warning'): ?>
+                          <i class="bi bi-exclamation-triangle"></i>
+                        <?php elseif ($notification['type'] == 'error'): ?>
+                          <i class="bi bi-x-circle"></i>
+                        <?php else: ?>
+                          <i class="bi bi-info-circle"></i>
+                        <?php endif; ?>
+                      </div>
+                      <div class="notification-text">
+                        <div class="notification-title"><?php echo htmlspecialchars($notification['title']); ?></div>
+                        <div class="notification-message"><?php echo htmlspecialchars($notification['message']); ?></div>
+                        <div class="notification-time"><?php echo formatTimeAgo($notification['created_at']); ?></div>
+                      </div>
+                    </div>
                   </div>
-                  <div class="notification-text">
-                    <div class="notification-title">Upload Berhasil</div>
-                    <div class="notification-message">Dokumen "Skripsi Teknik Informatika" Anda telah berhasil diunggah.</div>
-                    <div class="notification-time">5 jam yang lalu</div>
-                  </div>
-                </div>
-              </div>
-              <div class="notification-item unread">
-                <div class="notification-content">
-                  <div class="notification-icon-wrapper warning">
-                    <i class="bi bi-exclamation-triangle"></i>
-                  </div>
-                  <div class="notification-text">
-                    <div class="notification-title">Pembaruan Sistem</div>
-                    <div class="notification-message">Sistem akan melakukan maintenance pada hari Sabtu pukul 23:00 WIB.</div>
-                    <div class="notification-time">1 hari yang lalu</div>
-                  </div>
-                </div>
-              </div>
-              <div class="notification-item">
-                <div class="notification-content">
-                  <div class="notification-icon-wrapper info">
-                    <i class="bi bi-info-circle"></i>
-                  </div>
-                  <div class="notification-text">
-                    <div class="notification-title">Pengingat</div>
-                    <div class="notification-message">Jangan lupa untuk mengunggah laporan akhir Anda sebelum deadline.</div>
-                    <div class="notification-time">2 hari yang lalu</div>
-                  </div>
-                </div>
-              </div>
+                <?php endforeach; ?>
+              <?php endif; ?>
             </div>
             <div class="notification-footer">
-              <a href="#">Lihat semua notifikasi</a>
+              <a href="notifications.php">Lihat semua notifikasi</a>
             </div>
           </div>
         </div>
         
         <div id="userAvatarContainer">
           <?php 
+          // Check if user has profile photo
           if (hasProfilePhoto($user_id)) {
               echo '<img src="' . getProfilePhotoUrl($user_id, $user_data['email'], $user_data['username']) . '" alt="User Avatar" id="userAvatar">';
           } else {
@@ -1992,6 +1897,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
           ?>
         </div>
         
+        <!-- User Dropdown Menu -->
         <div class="user-dropdown" id="userDropdown">
           <div class="user-dropdown-header">
             <div id="dropdownAvatarContainer">
@@ -2030,157 +1936,228 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     </div>
   </nav>
 
-  <div class="header">
-    <div>
-      <h3>Selamat Datang, <?php echo htmlspecialchars($user_data['username']); ?></h3>
-      <small>Portal Repository Akademik POLITEKNIK NEGERI JEMBER</small>
-    </div>
-    <div id="headerAvatarContainer">
-      <?php 
-      if (hasProfilePhoto($user_id)) {
-          echo '<img src="' . getProfilePhotoUrl($user_id, $user_data['email'], $user_data['username']) . '" alt="User Avatar">';
-      } else {
-          echo getInitialsHtml($user_data['username'], 'normal');
-      }
-      ?>
-    </div>
-  </div>
-
-  <div class="search-box">
-    <input type="text" id="searchInput" placeholder="Cari dokumen, subjek, atau kata kunci...">
-  </div>
-
-  <div class="stats">
-    <div class="stat-card">
-      <div>
-        <h4><?php echo number_format($stats_data['total_archives']); ?></h4>
-        <p>Total Dokumen</p>
-      </div>
-      <i class="bi bi-journal-text"></i>
-    </div>
-    <div class="stat-card">
-      <div>
-        <h4>1.076</h4>
-        <p>Download Bulan Ini</p>
-      </div>
-      <i class="bi bi-cloud-arrow-down"></i>
-    </div>
-    <div class="stat-card">
-      <div>
-        <h4><?php echo number_format($stats_data['total_users']); ?></h4>
-        <p>Pengguna Aktif</p>
-      </div>
-      <i class="bi bi-people"></i>
-    </div>
-    <div class="stat-card">
-      <div>
-        <h4>187</h4>
-        <p>Upload Baru</p>
-      </div>
-      <i class="bi bi-cloud-arrow-up"></i>
-    </div>
-  </div>
-
   <div class="section-header">
-    <h5>Dokumen Terbaru</h5>
-    <a href="browser.php">Lihat Semua</a>
+    <h2>Upload Dokumen Baru</h2>
   </div>
 
-  <div class="filter-section">
-    <div class="filter-title">
-      <i class="bi bi-funnel"></i> Filter Dokumen
-    </div>
-    <form method="GET" action="">
-      <div class="filter-container">
-        <div class="filter-group">
-          <label class="filter-label" for="filter_jurusan">Jurusan</label>
-          <select class="filter-select" id="filter_jurusan" name="filter_jurusan">
-            <option value="">Semua Jurusan</option>
-            <?php foreach ($jurusan_data as $jurusan): ?>
-              <option value="<?php echo $jurusan['id_jurusan']; ?>" <?php echo ($filter_jurusan == $jurusan['id_jurusan']) ? 'selected' : ''; ?>>
-                <?php echo htmlspecialchars($jurusan['nama_jurusan']); ?>
-              </option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label class="filter-label" for="filter_prodi">Program Studi</label>
-          <select class="filter-select" id="filter_prodi" name="filter_prodi">
-            <option value="">Semua Program Studi</option>
-            <?php foreach ($prodi_data as $prodi): ?>
-              <option value="<?php echo $prodi['id_prodi']; ?>" <?php echo ($filter_prodi == $prodi['id_prodi']) ? 'selected' : ''; ?>>
-                <?php echo htmlspecialchars($prodi['nama_prodi']); ?>
-              </option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label class="filter-label" for="filter_tahun">Tahun</label>
-          <select class="filter-select" id="filter_tahun" name="filter_tahun">
-            <option value="">Semua Tahun</option>
-            <?php foreach ($tahun_data as $tahun): ?>
-              <option value="<?php echo $tahun; ?>" <?php echo ($filter_tahun == $tahun) ? 'selected' : ''; ?>>
-                <?php echo htmlspecialchars($tahun); ?>
-              </option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="filter-actions">
-          <button type="submit" class="btn-filter">
-            <i class="bi bi-search"></i> Terapkan
-          </button>
-          <a href="dashboard.php" class="btn-reset">
-            <i class="bi bi-arrow-clockwise"></i> Reset
-          </a>
+  <main class="upload-container">
+    <?php if (isset($_GET['success'])): ?>
+      <div class="alert alert-success">
+        <i class="bi bi-check-circle-fill"></i>
+        <div>
+          <strong>Sukses:</strong> Dokumen berhasil diunggah dan akan melalui proses verifikasi.
         </div>
       </div>
-    </form>
-  </div>
+    <?php endif; ?>
 
-  <?php if (empty($documents_data)): ?>
-    <div class="empty-state">
-      <div class="empty-state-card">
-        <div class="empty-state-icon">
-          <i class="bi bi-inbox"></i>
-        </div>
-        <h3 class="empty-state-title">Tidak ada dokumen ditemukan</h3>
-        <p class="empty-state-description">Belum ada dokumen yang tersedia di repository dengan filter yang dipilih.</p>
-        <a href="upload.php" class="empty-state-action">
-          <i class="bi bi-cloud-upload"></i> Unggah Dokumen
-        </a>
+    <div class="alert alert-warning">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <div>
+        <strong>Perhatian:</strong> Pastikan dokumen yang Anda upload telah memenuhi ketentuan format (PDF, DOC, DOCX) dan tidak melanggar hak cipta. Dokumen akan melalui proses verifikasi oleh admin sebelum dipublikasi.
       </div>
     </div>
-  <?php else: ?>
-    <?php foreach ($documents_data as $document): ?>
-      <div class="document-card">
-        <span class="badge <?php echo getStatusBadge($document['status_id']); ?>"><?php echo getStatusName($document['status_id']); ?></span>
-        <span class="badge badge-danger"><?php echo getDocumentTypeName($document['type']); ?></span>
-        <h6><?php echo htmlspecialchars($document['title']); ?></h6>
-        <p><?php echo htmlspecialchars($document['abstract']); ?></p>
-        <div class="doc-footer">
-          <small>
-            <i class="bi bi-calendar"></i> <?php echo date('d F Y', strtotime($document['upload_date'])); ?>
-            <?php if ($document['department']): ?>
-              • <i class="bi bi-building"></i> <?php echo htmlspecialchars($document['department']); ?>
-            <?php endif; ?>
-            <?php if ($document['prodi']): ?>
-              • <i class="bi bi-book"></i> <?php echo htmlspecialchars($document['prodi']); ?>
-            <?php endif; ?>
-            <?php if ($document['year']): ?>
-              • <i class="bi bi-calendar3"></i> <?php echo htmlspecialchars($document['year']); ?>
-            <?php endif; ?>
-          </small>
-          <div>
-            <small><i class="bi bi-download"></i> <?php echo rand(100, 500); ?> Download</small>
-            <button class="btn-download" onclick="viewDocument(<?php echo $document['id_book']; ?>)">Lihat</button>
+
+    <form id="uploadForm">
+      <input type="hidden" name="action" value="upload">
+      
+      <div class="form-group">
+        <label for="tipe_dokumen">Tipe Dokumen <span class="required">*</span></label>
+        <select id="tipe_dokumen" name="tipe_dokumen" class="form-control" required>
+          <option value="" disabled selected>-- Pilih Tipe Dokumen --</option>
+          <option value="book">Buku</option>
+          <option value="journal">Jurnal</option>
+          <option value="thesis">Tesis</option>
+          <option value="final_project">Tugas Akhir</option>
+          <option value="research">Penelitian</option>
+          <option value="ebook">E-Book</option>
+          <option value="other">Lainnya</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="judul">Judul Dokumen <span class="required">*</span></label>
+        <input type="text" id="judul" name="judul" class="form-control" required>
+      </div>
+
+      <div class="form-group">
+        <label for="abstrak">Abstrak <span class="required">*</span></label>
+        <textarea id="abstrak" name="abstrak" class="form-control" required></textarea>
+      </div>
+      
+      <div class="form-group">
+        <label for="id_tema">Tema/Topik <span class="required">*</span></label>
+        <select id="id_tema" name="id_tema" class="form-control" required>
+          <option value="" disabled selected>-- Pilih Tema --</option>
+          <?php
+          try {
+            $stmt = $pdo->query("SELECT id_tema, nama_tema FROM master_tema ORDER BY nama_tema");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+              echo '<option value="' . $row['id_tema'] . '">' . htmlspecialchars($row['nama_tema']) . '</option>';
+            }
+          } catch (PDOException $e) {
+            echo '<option value="">Error memuat tema</option>';
+          }
+          ?>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="id_jurusan">Jurusan <span class="required">*</span></label>
+        <select id="id_jurusan" name="id_jurusan" class="form-control" required>
+          <option value="" disabled selected>-- Pilih Jurusan --</option>
+          <?php
+          try {
+            $stmt = $pdo->query("SELECT id_jurusan, nama_jurusan FROM master_jurusan ORDER BY nama_jurusan");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+              echo '<option value="' . $row['id_jurusan'] . '">' . htmlspecialchars($row['nama_jurusan']) . '</option>';
+            }
+          } catch (PDOException $e) {
+            echo '<option value="">Error memuat jurusan</option>';
+          }
+          ?>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="id_prodi">Program Studi <span class="required">*</span></label>
+        <select id="id_prodi" name="id_prodi" class="form-control" required>
+          <option value="" disabled selected>-- Pilih Program Studi --</option>
+          <?php
+          try {
+            $stmt = $pdo->query("SELECT id_prodi, nama_prodi FROM master_prodi ORDER BY nama_prodi");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+              echo '<option value="' . $row['id_prodi'] . '">' . htmlspecialchars($row['nama_prodi']) . '</option>';
+            }
+          } catch (PDOException $e) {
+            echo '<option value="">Error memuat program studi</option>';
+          }
+          ?>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="year_id">Tahun <span class="required">*</span></label>
+        <select id="year_id" name="year_id" class="form-control" required>
+          <option value="" disabled selected>-- Pilih Tahun --</option>
+          <?php
+          try {
+            $stmt = $pdo->query("SELECT year_id, tahun FROM master_tahun ORDER BY tahun DESC");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+              echo '<option value="' . $row['year_id'] . '">' . htmlspecialchars($row['tahun']) . '</option>';
+            }
+          } catch (PDOException $e) {
+            for($i = date('Y'); $i >= 2020; $i--) {
+              echo '<option value="' . $i . '">' . $i . '</option>';
+            }
+          }
+          ?>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="status_id">Status <span class="required">*</span></label>
+        <select id="status_id" name="status_id" class="form-control" required>
+          <option value="" disabled selected>-- Pilih Status --</option>
+          <?php
+          try {
+            $stmt = $pdo->query("SELECT status_id, nama_status FROM master_status_dokumen ORDER BY nama_status");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+              echo '<option value="' . $row['status_id'] . '">' . htmlspecialchars($row['nama_status']) . '</option>';
+            }
+          } catch (PDOException $e) {
+            echo '<option value="1">Aktif</option>';
+            echo '<option value="2">Tidak Aktif</option>';
+            echo '<option value="3">Menunggu</option>';
+          }
+          ?>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="format_id">Format <span class="required">*</span></label>
+        <select id="format_id" name="format_id" class="form-control" required>
+          <option value="" disabled selected>-- Pilih Format --</option>
+          <?php
+          try {
+            $stmt = $pdo->query("SELECT format_id, nama_format FROM master_dokumen ORDER BY nama_format");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+              echo '<option value="' . $row['format_id'] . '">' . htmlspecialchars($row['nama_format']) . '</option>';
+            }
+          } catch (PDOException $e) {
+            echo '<option value="1">PDF</option>';
+            echo '<option value="2">DOC/DOCX</option>';
+            echo '<option value="3">PPT/PPTX</option>';
+          }
+          ?>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="policy_id">Kebijakan <span class="required">*</span></label>
+        <select id="policy_id" name="policy_id" class="form-control" required>
+          <option value="" disabled selected>-- Pilih Kebijakan --</option>
+          <?php
+          try {
+            $stmt = $pdo->query("SELECT policy_id, nama_policy FROM master_policy ORDER BY nama_policy");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+              echo '<option value="' . $row['policy_id'] . '">' . htmlspecialchars($row['nama_policy']) . '</option>';
+            }
+          } catch (PDOException $e) {
+            echo '<option value="1">Akses Terbuka</option>';
+            echo '<option value="2">Akses Terbatas</option>';
+          }
+          ?>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Penulis <span class="required">*</span></label>
+        <div id="authors-container" class="dynamic-field-container">
+          <div class="input-group">
+            <input type="text" class="form-control" name="authors[]" placeholder="Nama penulis" required>
+            <button type="button" class="btn-remove" style="display: none;">&times;</button>
           </div>
         </div>
+        <button type="button" class="btn-add" id="add-author-btn"><i class="bi bi-plus-circle"></i> Tambah penulis</button>
       </div>
-    <?php endforeach; ?>
-  <?php endif; ?>
 
-  <footer>© 2025 SIPORA - Sistem Informasi Portal Repository Akademik POLITEKNIK NEGERI JEMBER</footer>
+      <div class="form-group">
+        <label>Kata Kunci <span class="required">*</span></label>
+        <div id="keywords-container" class="dynamic-field-container">
+          <div class="input-group">
+            <input type="text" class="form-control" name="keywords[]" placeholder="Masukkan kata kunci" required>
+            <button type="button" class="btn-remove" style="display: none;">&times;</button>
+          </div>
+        </div>
+        <button type="button" class="btn-add" id="add-keyword-btn"><i class="bi bi-plus-circle"></i> Tambah kata kunci</button>
+      </div>
 
+      <div class="form-group">
+        <label>Upload File <span class="required">*</span></label>
+        <div class="file-upload-area" id="file-upload-area">
+          <i class="bi bi-cloud-upload" style="font-size: 48px; color: var(--text-muted);"></i>
+          <p style="margin: 15px 0 5px; color: var(--text-primary);">Drag and drop file Anda di sini atau</p>
+          <label for="dokumen_file" class="file-upload-label">Pilih File</label>
+          <input type="file" id="dokumen_file" name="dokumen_file" accept=".pdf,.doc,.docx" required>
+          <div class="file-name-display" id="file-name-display">Belum ada file yang dipilih.</div>
+        </div>
+      </div>
+
+      <div class="progress-container" id="progressContainer">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-text">
+          <span id="progressPercent">0%</span>
+          <span id="progressStatus">Mengunggah...</span>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit" id="submitBtn">Upload Dokumen</button>
+    </form>
+  </main>
+
+  <!-- Profile Modal -->
   <div class="modal fade" id="profileModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -2191,6 +2168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
           </button>
         </div>
         <div class="modal-body">
+          <!-- Profile View -->
           <div id="profileView">
             <div class="profile-header">
               <div class="profile-avatar-container">
@@ -2258,6 +2236,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
             </div>
           </div>
           
+          <!-- Photo Upload Form -->
           <div id="photoUploadForm" style="display: none;">
             <div class="photo-upload-container">
               <label class="photo-upload-label">Ubah Foto Profil</label>
@@ -2276,6 +2255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
             </div>
           </div>
           
+          <!-- Edit Profile Form -->
           <div id="editProfileForm" class="edit-profile-form">
             <form method="POST" action="">
               <input type="hidden" name="update_profile" value="1">
@@ -2327,6 +2307,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     </div>
   </div>
 
+  <!-- Settings Modal -->
   <div class="modal fade" id="settingsModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -2517,6 +2498,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
               </div>
             </div>
             
+            <!-- Password Change Form -->
             <div id="passwordForm" class="password-form">
               <form method="POST" action="">
                 <input type="hidden" name="change_password" value="1">
@@ -2563,6 +2545,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     </div>
   </div>
 
+  <!-- Help Modal -->
   <div class="modal fade" id="helpModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -2583,10 +2566,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
               <div id="collapseOne" class="accordion-collapse collapse show" aria-labelledby="headingOne" data-bs-parent="#helpAccordion">
                 <div class="accordion-body">
                   <ol>
-                    <li>Klik menu "Upload" di navigasi atas</li>
-                    <li>Isi form yang tersedia dengan informasi dokumen</li>
+                    <li>Isi semua field yang diperlukan pada form upload</li>
                     <li>Pilih file dokumen yang akan diunggah</li>
-                    <li>Klik tombol "Unggah" untuk mengunggah dokumen</li>
+                    <li>Klik tombol "Upload Dokumen"</li>
                     <li>Tunggu hingga proses unggah selesai</li>
                   </ol>
                 </div>
@@ -2595,52 +2577,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
             <div class="accordion-item">
               <h2 class="accordion-header" id="headingTwo">
                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
-                  Cara Mencari Dokumen
-                </button>
-              </h2>
-              <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#helpAccordion">
-                <div class="accordion-body">
-                  <ol>
-                    <li>Gunakan kotak pencarian di halaman beranda</li>
-                    <li>Masukkan kata kunci terkait dokumen yang dicari</li>
-                    <li>Gunakan filter untuk mempersempit hasil pencarian</li>
-                    <li>Klik dokumen yang diinginkan untuk melihat detailnya</li>
-                  </ol>
-                </div>
-              </div>
-            </div>
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="headingThree">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
-                  Cara Mengunduh Dokumen
-                </button>
-              </h2>
-              <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#helpAccordion">
-                <div class="accordion-body">
-                  <ol>
-                    <li>Buka halaman detail dokumen</li>
-                    <li>Klik tombol "Unduh" yang tersedia</li>
-                    <li>Tunggu hingga file terunduh ke perangkat Anda</li>
-                  </ol>
-                </div>
-              </div>
-            </div>
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="headingFour">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFour" aria-expanded="false" aria-controls="collapseFour">
                   Format Dokumen yang Didukung
                 </button>
               </h2>
-              <div id="collapseFour" class="accordion-collapse collapse" aria-labelledby="headingFour" data-bs-parent="#helpAccordion">
+              <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#helpAccordion">
                 <div class="accordion-body">
                   <p>Sistem kami mendukung berbagai format dokumen, antara lain:</p>
                   <ul>
                     <li>PDF (.pdf)</li>
                     <li>Microsoft Word (.doc, .docx)</li>
                     <li>Microsoft PowerPoint (.ppt, .pptx)</li>
-                    <li>Microsoft Excel (.xls, .xlsx)</li>
                     <li>Format gambar (.jpg, .jpeg, .png)</li>
                   </ul>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="headingThree">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                  Ukuran File Maksimal
+                </button>
+              </h2>
+              <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#helpAccordion">
+                <div class="accordion-body">
+                  <p>Ukuran file maksimal yang dapat diunggah adalah 10MB. Jika file Anda lebih besar dari itu, pertimbangkan untuk mengompres file atau membaginya menjadi beberapa bagian.</p>
                 </div>
               </div>
             </div>
@@ -2663,6 +2623,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     </div>
   </div>
 
+  <!-- Notification -->
   <div id="notification" class="notification">
     <div class="notification-header">
       <div class="notification-title" id="notificationTitle">Notifikasi</div>
@@ -2673,30 +2634,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     </div>
   </div>
 
+  <!-- Footer -->
+  <footer>© 2025 SIPORA - Sistem Informasi Portal Repository Akademik POLITEKNIK NEGERI JEMBER</footer>
+
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
+    // Mobile menu toggle
     document.getElementById('mobileMenuBtn').addEventListener('click', function() {
       document.getElementById('navLinks').classList.toggle('active');
     });
 
+    // User dropdown toggle
     document.getElementById('userAvatarContainer').addEventListener('click', function(e) {
       e.stopPropagation();
       document.getElementById('userDropdown').classList.toggle('active');
       document.getElementById('notificationDropdown').classList.remove('active');
     });
 
+    // Notification dropdown toggle
     document.getElementById('notificationIcon').addEventListener('click', function(e) {
       e.stopPropagation();
       document.getElementById('notificationDropdown').classList.toggle('active');
       document.getElementById('userDropdown').classList.remove('active');
     });
 
+    // Close dropdowns when clicking outside
     document.addEventListener('click', function() {
       document.getElementById('userDropdown').classList.remove('active');
       document.getElementById('notificationDropdown').classList.remove('active');
     });
 
+    // Prevent dropdowns from closing when clicking inside them
     document.getElementById('userDropdown').addEventListener('click', function(e) {
       e.stopPropagation();
     });
@@ -2705,6 +2675,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       e.stopPropagation();
     });
 
+    // Profile Modal Functions
     function openProfileModal() {
       const modal = document.getElementById('profileModal');
       modal.style.display = 'block';
@@ -2713,6 +2684,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       }, 10);
       document.getElementById('userDropdown').classList.remove('active');
       
+      // Reset to view mode
       document.getElementById('profileView').style.display = 'block';
       document.getElementById('photoUploadForm').style.display = 'none';
       document.getElementById('editProfileForm').classList.remove('active');
@@ -2720,6 +2692,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       document.getElementById('saveProfileBtn').style.display = 'none';
     }
 
+    // Settings Modal Functions
     function openSettingsModal() {
       const modal = document.getElementById('settingsModal');
       modal.style.display = 'block';
@@ -2729,6 +2702,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       document.getElementById('userDropdown').classList.remove('active');
     }
 
+    // Help Modal Functions
     function openHelpModal() {
       const modal = document.getElementById('helpModal');
       modal.style.display = 'block';
@@ -2746,6 +2720,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       }, 300);
     }
 
+    // Photo Upload Functions
     function openPhotoUpload() {
       document.getElementById('profileView').style.display = 'none';
       document.getElementById('photoUploadForm').style.display = 'block';
@@ -2784,33 +2759,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
         return;
       }
       
+      // Validate file size (2MB max)
       if (file.size > 2097152) {
         showNotification('error', 'Error', 'Ukuran file maksimal 2MB');
         return;
       }
       
+      // Validate file type
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
       if (!allowedTypes.includes(file.type)) {
         showNotification('error', 'Error', 'Hanya file JPG, JPEG, PNG, dan GIF yang diperbolehkan');
         return;
       }
       
+      // Create form data
       const formData = new FormData();
       formData.append('profile_photo', file);
       formData.append('upload_photo', '1');
       
+      // Show loading notification
       showNotification('info', 'Mengunggah', 'Sedang mengunggah foto...');
       
-      fetch('dashboard.php', {
+      // Send AJAX request
+      fetch('upload.php', {
         method: 'POST',
         body: formData
       })
       .then(response => response.text())
       .then(data => {
+        // Refresh images with cache busting
         refreshProfileImages();
         
+        // Show success notification
         showNotification('success', 'Foto Profil Diperbarui', 'Foto profil Anda telah berhasil diperbarui.');
         
+        // Close photo upload form
         closePhotoUpload();
       })
       .catch(error => {
@@ -2818,10 +2801,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       });
     }
 
+    // Function to refresh profile images with cache busting
     function refreshProfileImages() {
       const timestamp = new Date().getTime();
       const newImageUrl = `uploads/profile_photos/<?php echo $user_id; ?>.jpg?t=${timestamp}`;
       
+      // Update all profile images on the page
       const userAvatar = document.getElementById('userAvatar');
       if (userAvatar) {
         userAvatar.src = newImageUrl;
@@ -2832,17 +2817,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
         profileAvatarImg.src = newImageUrl;
       }
       
+      // Update dropdown avatar
       const dropdownAvatar = document.querySelector('.user-dropdown-header img');
       if (dropdownAvatar) {
         dropdownAvatar.src = newImageUrl;
       }
-      
-      const headerAvatar = document.querySelector('.header img');
-      if (headerAvatar) {
-        headerAvatar.src = newImageUrl;
-      }
     }
 
+    // Toggle Edit Profile Form
     function toggleEditProfile() {
       const profileView = document.getElementById('profileView');
       const editProfileForm = document.getElementById('editProfileForm');
@@ -2850,11 +2832,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       const saveProfileBtn = document.getElementById('saveProfileBtn');
       
       if (editProfileForm.classList.contains('active')) {
+        // Switch to view mode
         profileView.style.display = 'block';
         editProfileForm.classList.remove('active');
         editProfileBtn.style.display = 'inline-block';
         saveProfileBtn.style.display = 'none';
       } else {
+        // Switch to edit mode
         profileView.style.display = 'none';
         editProfileForm.classList.add('active');
         editProfileBtn.style.display = 'none';
@@ -2862,12 +2846,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       }
     }
 
+    // Toggle Password Form
     function togglePasswordForm() {
       const passwordForm = document.getElementById('passwordForm');
       passwordForm.classList.toggle('active');
     }
 
+    // Settings Tab Functions
     function switchSettingsTab(tabName) {
+      // Remove active class from all tabs and contents
       document.querySelectorAll('.settings-tab').forEach(tab => {
         tab.classList.remove('active');
       });
@@ -2875,20 +2862,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
         content.classList.remove('active');
       });
       
+      // Add active class to selected tab and content
       event.target.classList.add('active');
       document.getElementById(tabName + '-settings').classList.add('active');
     }
 
+    // Toggle Switch Function
     function toggleSwitch(switchId) {
       const toggleSwitch = document.getElementById(switchId);
       toggleSwitch.classList.toggle('active');
     }
 
+    // Save Settings Function
     function saveSettings() {
       showNotification('success', 'Pengaturan Disimpan', 'Pengaturan Anda telah berhasil disimpan.');
       closeModal('settingsModal');
     }
 
+    // Delete Account Function
     function deleteAccount() {
       if (confirm('Apakah Anda yakin ingin menghapus akun Anda? Tindakan ini tidak dapat dibatalkan.')) {
         showNotification('error', 'Akun Dihapus', 'Akun Anda telah dihapus. Anda akan diarahkan ke halaman beranda.');
@@ -2898,30 +2889,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       }
     }
 
-    function logout() {
-      showNotification('info', 'Logout', 'Anda akan keluar dari sistem...');
-      
-      setTimeout(() => {
-        showNotification('success', 'Logout Berhasil', 'Anda telah keluar dari sistem.');
-        
-        setTimeout(() => {
-          window.location.href = 'auth.php';
-        }, 2000);
-      }, 1000);
-    }
-
+    // Notification functions
     function showNotification(type, title, message) {
       const notification = document.getElementById('notification');
       const notificationTitle = document.getElementById('notificationTitle');
       const notificationBody = document.getElementById('notificationBody');
       
+      // Set notification type
       notification.className = `notification ${type}`;
       
+      // Set content
       notificationTitle.textContent = title;
       notificationBody.textContent = message;
       
+      // Show notification
       notification.style.display = 'block';
       
+      // Auto hide after 5 seconds
       setTimeout(() => {
         hideNotification();
       }, 5000);
@@ -2932,71 +2916,321 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
       notification.style.display = 'none';
     }
 
-    function markAllAsRead() {
-      document.querySelectorAll('.notification-item').forEach(item => {
-        item.classList.remove('unread');
+    // Mark notification as read
+    function markNotificationAsRead(notificationId) {
+      const formData = new FormData();
+      formData.append('mark_notification_read', '1');
+      formData.append('notification_id', notificationId);
+      
+      fetch('upload.php', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Remove unread class from notification
+          const notificationItem = document.querySelector(`.notification-item[data-id="${notificationId}"]`);
+          if (notificationItem) {
+            notificationItem.classList.remove('unread');
+          }
+          
+          // Update unread count
+          const badge = document.querySelector('.notification-badge');
+          if (badge) {
+            const currentCount = parseInt(badge.textContent);
+            if (currentCount > 1) {
+              badge.textContent = currentCount - 1;
+            } else {
+              badge.style.display = 'none';
+            }
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error marking notification as read:', error);
       });
-      
-      const badge = document.querySelector('.notification-badge');
-      if (badge) {
-        badge.style.display = 'none';
-      }
-      
-      return false;
     }
 
-    document.getElementById('searchInput').addEventListener('input', function() {
-      const searchTerm = this.value.toLowerCase();
-      const documentCards = document.querySelectorAll('.document-card');
+    // Mark all notifications as read
+    function markAllAsRead() {
+      const formData = new FormData();
+      formData.append('mark_all_read', '1');
       
-      documentCards.forEach(card => {
-        const title = card.querySelector('h6').textContent.toLowerCase();
-        const description = card.querySelector('p').textContent.toLowerCase();
-        
-        if (title.includes(searchTerm) || description.includes(searchTerm)) {
-          card.style.display = 'block';
+      fetch('upload.php', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Remove unread class from all notifications
+          document.querySelectorAll('.notification-item.unread').forEach(item => {
+            item.classList.remove('unread');
+          });
+          
+          // Hide badge
+          const badge = document.querySelector('.notification-badge');
+          if (badge) {
+            badge.style.display = 'none';
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error marking all notifications as read:', error);
+      });
+      
+      return false; // Prevent default link behavior
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const addAuthorBtn = document.getElementById('add-author-btn');
+      const authorsContainer = document.getElementById('authors-container');
+      const addKeywordBtn = document.getElementById('add-keyword-btn');
+      const keywordsContainer = document.getElementById('keywords-container');
+      const fileUploadInput = document.getElementById('dokumen_file');
+      const fileNameDisplay = document.getElementById('file-name-display');
+      const fileUploadArea = document.getElementById('file-upload-area');
+      const uploadForm = document.getElementById('uploadForm');
+      const submitBtn = document.getElementById('submitBtn');
+      const progressContainer = document.getElementById('progressContainer');
+      const progressFill = document.getElementById('progressFill');
+      const progressPercent = document.getElementById('progressPercent');
+      const progressStatus = document.getElementById('progressStatus');
+
+      // Function to add a new input field
+      function addField(container, placeholder, name) {
+        const inputGroup = document.createElement('div');
+        inputGroup.className = 'input-group';
+
+        const newInput = document.createElement('input');
+        newInput.type = 'text';
+        newInput.className = 'form-control';
+        newInput.name = name;
+        newInput.placeholder = placeholder;
+        newInput.required = true;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn-remove';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.onclick = function() {
+          inputGroup.remove();
+          updateRemoveButtons(container);
+        };
+
+        inputGroup.appendChild(newInput);
+        inputGroup.appendChild(removeBtn);
+        container.appendChild(inputGroup);
+        updateRemoveButtons(container);
+      }
+
+      // Function to show/hide remove buttons
+      function updateRemoveButtons(container) {
+        const inputGroups = container.querySelectorAll('.input-group');
+        inputGroups.forEach((group, index) => {
+          const removeBtn = group.querySelector('.btn-remove');
+          if (inputGroups.length > 1) {
+            removeBtn.style.display = 'block';
+          } else {
+            removeBtn.style.display = 'none';
+          }
+        });
+      }
+
+      addAuthorBtn.addEventListener('click', () => addField(authorsContainer, 'Nama penulis', 'authors[]'));
+      addKeywordBtn.addEventListener('click', () => addField(keywordsContainer, 'Masukkan kata kunci', 'keywords[]'));
+
+      // File upload display
+      fileUploadInput.addEventListener('change', function() {
+        if (this.files && this.files.length > 0) {
+          fileNameDisplay.textContent = `File yang dipilih: ${this.files[0].name}`;
         } else {
-          card.style.display = 'none';
+          fileNameDisplay.textContent = 'Belum ada file yang dipilih.';
         }
       });
-    });
 
-    document.querySelectorAll('.btn-download').forEach(button => {
-      button.addEventListener('click', function() {
-        const documentTitle = this.closest('.document-card').querySelector('h6').textContent;
-        showNotification('success', 'Download Berhasil', `Dokumen "${documentTitle}" telah diunduh.`);
+      // Drag and drop functionality
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        fileUploadArea.addEventListener(eventName, preventDefaults, false);
+      });
+
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        fileUploadArea.addEventListener(eventName, () => fileUploadArea.classList.add('dragover'), false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        fileUploadArea.addEventListener(eventName, () => fileUploadArea.classList.remove('dragover'), false);
+      });
+
+      fileUploadArea.addEventListener('drop', function(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) {
+          fileUploadInput.files = files;
+          const event = new Event('change', { bubbles: true });
+          fileUploadInput.dispatchEvent(event);
+        }
+      });
+
+      // Form submission
+      uploadForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Show progress
+        progressContainer.style.display = 'block';
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Mengunggah...';
+        
+        // Create FormData object
+        const formData = new FormData(uploadForm);
+        
+        // Simulate progress
+        let progress = 0;
+        const interval = setInterval(() => {
+          progress += 5;
+          if (progress > 90) {
+            clearInterval(interval);
+          }
+          progressFill.style.width = progress + '%';
+          progressPercent.textContent = progress + '%';
+        }, 200);
+        
+        // Send form data to server
+        fetch('', {
+          method: 'POST',
+          body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+          clearInterval(interval);
+          progressFill.style.width = '100%';
+          progressPercent.textContent = '100%';
+          progressStatus.textContent = 'Selesai!';
+          
+          if (data.success) {
+            // Show success message
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success';
+            alertDiv.innerHTML = `
+              <i class="bi bi-check-circle-fill"></i>
+              <div>
+                <strong>Sukses:</strong> ${data.message}
+              </div>
+            `;
+            
+            // Insert alert at the top of the container
+            const container = document.querySelector('.upload-container');
+            container.insertBefore(alertDiv, container.firstChild);
+            
+            // Reset form after a delay
+            setTimeout(() => {
+              uploadForm.reset();
+              fileNameDisplay.textContent = 'Belum ada file yang dipilih.';
+              progressContainer.style.display = 'none';
+              progressFill.style.width = '0%';
+              progressPercent.textContent = '0%';
+              progressStatus.textContent = 'Mengunggah...';
+              
+              // Redirect to dashboard if specified
+              if (data.redirect) {
+                window.location.href = data.redirect;
+              }
+            }, 2000);
+          } else {
+            // Show error message
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-error';
+            alertDiv.innerHTML = `
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              <div>
+                <strong>Error:</strong> ${data.message}
+              </div>
+            `;
+            
+            // Insert alert at the top of the container
+            const container = document.querySelector('.upload-container');
+            container.insertBefore(alertDiv, container.firstChild);
+            
+            // Reset progress
+            progressContainer.style.display = 'none';
+            progressFill.style.width = '0%';
+            progressPercent.textContent = '0%';
+            progressStatus.textContent = 'Mengunggah...';
+          }
+        })
+        .catch(error => {
+          clearInterval(interval);
+          console.error('Error:', error);
+          
+          // Show error message
+          const alertDiv = document.createElement('div');
+          alertDiv.className = 'alert alert-error';
+          alertDiv.innerHTML = `
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <div>
+              <strong>Error:</strong> Terjadi kesalahan saat mengunggah dokumen. Silakan coba lagi.
+            </div>
+          `;
+          
+          // Insert alert at the top of the container
+          const container = document.querySelector('.upload-container');
+          container.insertBefore(alertDiv, container.firstChild);
+          
+          // Reset progress
+          progressContainer.style.display = 'none';
+          progressFill.style.width = '0%';
+          progressPercent.textContent = '0%';
+          progressStatus.textContent = 'Mengunggah...';
+        })
+        .finally(() => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Upload Dokumen';
+        });
+      });
+      
+      // Mark notification as read when clicked
+      document.querySelectorAll('.notification-item').forEach(item => {
+        item.addEventListener('click', function() {
+          const notificationId = this.getAttribute('data-id');
+          if (notificationId && this.classList.contains('unread')) {
+            markNotificationAsRead(notificationId);
+          }
+        });
       });
     });
 
-    function viewDocument(docId) {
-      window.location.href = 'view_document.php?id=' + docId;
-    }
-
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-      return new bootstrap.Tooltip(tooltipTriggerEl)
-    });
-
+    // Show notification if profile was updated
     <?php if (isset($profile_updated) && $profile_updated): ?>
       showNotification('success', 'Profil Diperbarui', 'Profil Anda telah berhasil diperbarui.');
     <?php endif; ?>
 
+    // Show notification if password was updated
     <?php if (isset($password_updated) && $password_updated): ?>
       showNotification('success', 'Password Diubah', 'Password Anda telah berhasil diubah.');
     <?php endif; ?>
 
+    // Show notification if photo was updated
     <?php if (isset($photo_updated) && $photo_updated): ?>
       showNotification('success', 'Foto Profil Diperbarui', 'Foto profil Anda telah berhasil diperbarui.');
     <?php endif; ?>
 
+    // Show notification if there was an error updating profile
     <?php if (isset($profile_error)): ?>
       showNotification('error', 'Error', '<?php echo addslashes($profile_error); ?>');
     <?php endif; ?>
 
+    // Show notification if there was an error updating password
     <?php if (isset($password_error)): ?>
       showNotification('error', 'Error', '<?php echo addslashes($password_error); ?>');
     <?php endif; ?>
 
+    // Show notification if there was an error uploading photo
     <?php if (isset($photo_error)): ?>
       showNotification('error', 'Error', '<?php echo addslashes($photo_error); ?>');
     <?php endif; ?>
