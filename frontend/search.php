@@ -26,6 +26,29 @@ try {
     die("Database error: " . $e->getMessage());
 }
 
+// Ambil data notifikasi untuk user
+try {
+    $stmt = $pdo->prepare("
+        SELECT * FROM notifications 
+        WHERE user_id = :user_id 
+        ORDER BY created_at DESC 
+        LIMIT 10
+    ");
+    $stmt->execute(['user_id' => $user_id]);
+    $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Hitung notifikasi yang belum dibaca
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) as unread_count FROM notifications 
+        WHERE user_id = :user_id AND is_read = 0
+    ");
+    $stmt->execute(['user_id' => $user_id]);
+    $unread_count = $stmt->fetch(PDO::FETCH_ASSOC)['unread_count'];
+} catch (PDOException $e) {
+    $notifications = [];
+    $unread_count = 0;
+}
+
 // Ambil data profil lengkap user
 try {
     $stmt = $pdo->prepare("
@@ -537,6 +560,178 @@ function getRoleName($role_id) {
       font-size: 24px; 
       color: var(--text-primary); 
       cursor: pointer; 
+    }
+
+    /* --- Notification Styles --- */
+    .notification-icon {
+      position: relative;
+      cursor: pointer;
+      margin-right: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      transition: all 0.2s ease;
+    }
+    
+    .notification-icon:hover {
+      background-color: #f8f9fa;
+    }
+    
+    .notification-icon i {
+      font-size: 20px;
+      color: var(--text-secondary);
+      transition: color 0.2s ease;
+    }
+    
+    .notification-icon:hover i {
+      color: var(--primary-blue);
+    }
+    
+    .notification-badge {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background-color: #dc3545;
+      color: white;
+      font-size: 10px;
+      font-weight: 600;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--white);
+    }
+    
+    .notification-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 10px;
+      background-color: var(--white);
+      border-radius: 8px;
+      box-shadow: var(--shadow-md);
+      width: 320px;
+      max-height: 400px;
+      z-index: 1001;
+      display: none;
+      overflow: hidden;
+    }
+    
+    .notification-dropdown.active {
+      display: block;
+      animation: fadeIn 0.2s ease;
+    }
+    
+    .notification-header {
+      padding: 12px 15px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .notification-header h5 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    .notification-header a {
+      font-size: 12px;
+      color: var(--primary-blue);
+      text-decoration: none;
+    }
+    
+    .notification-list {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    
+    .notification-item {
+      padding: 12px 15px;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background-color 0.2s ease;
+    }
+    
+    .notification-item:hover {
+      background-color: #f8f9fa;
+    }
+    
+    .notification-item.unread {
+      background-color: #f0f7ff;
+    }
+    
+    .notification-content {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .notification-icon-wrapper {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    
+    .notification-icon-wrapper.info {
+      background-color: #e3f2fd;
+      color: #1976d2;
+    }
+    
+    .notification-icon-wrapper.success {
+      background-color: #e8f5e9;
+      color: #388e3c;
+    }
+    
+    .notification-icon-wrapper.warning {
+      background-color: #fff8e1;
+      color: #f57c00;
+    }
+    
+    .notification-icon-wrapper.error {
+      background-color: #ffebee;
+      color: #d32f2f;
+    }
+    
+    .notification-text {
+      flex: 1;
+    }
+    
+    .notification-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    
+    .notification-message {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    
+    .notification-time {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    
+    .notification-footer {
+      padding: 10px 15px;
+      text-align: center;
+      border-top: 1px solid var(--border-color);
+    }
+    
+    .notification-footer a {
+      font-size: 13px;
+      color: var(--primary-blue);
+      text-decoration: none;
     }
 
     /* --- User Dropdown --- */
@@ -1557,12 +1752,62 @@ function getRoleName($role_id) {
       <div class="nav-links" id="navLinks">
         <a href="dashboard.php">Beranda</a>
         <a href="upload.php">Upload</a>
-        <a href="browser.php">Browser</a>
-        <a href="search.php" class="active">Search</a>
+        <a href="browser.php" class="active">Browser</a>
+        <a href="search.php">Search</a>
         <a href="download.php">Download</a>
       </div>
       <div class="user-info">
         <span><?php echo htmlspecialchars($user_data['username']); ?></span>
+        
+        <!-- Notification Icon -->
+        <div class="notification-icon" id="notificationIcon">
+          <i class="bi bi-bell-fill"></i>
+          <?php if ($unread_count > 0): ?>
+            <span class="notification-badge"><?php echo $unread_count; ?></span>
+          <?php endif; ?>
+          
+          <div class="notification-dropdown" id="notificationDropdown">
+            <div class="notification-header">
+              <h5>Notifikasi</h5>
+              <a href="#" onclick="markAllAsRead()">Tandai semua dibaca</a>
+            </div>
+            <div class="notification-list">
+              <?php if (empty($notifications)): ?>
+                <div class="notification-item">
+                  <div class="notification-content">
+                    <div class="notification-icon-wrapper info">
+                      <i class="bi bi-info-circle"></i>
+                    </div>
+                    <div class="notification-text">
+                      <div class="notification-title">Tidak Ada Notifikasi</div>
+                      <div class="notification-message">Anda tidak memiliki notifikasi saat ini.</div>
+                      <div class="notification-time">Sekarang</div>
+                    </div>
+                  </div>
+                </div>
+              <?php else: ?>
+                <?php foreach ($notifications as $notification): ?>
+                  <div class="notification-item <?php echo $notification['is_read'] == 0 ? 'unread' : ''; ?>">
+                    <div class="notification-content">
+                      <div class="notification-icon-wrapper <?php echo $notification['type']; ?>">
+                        <i class="bi bi-<?php echo getNotificationIcon($notification['type']); ?>"></i>
+                      </div>
+                      <div class="notification-text">
+                        <div class="notification-title"><?php echo htmlspecialchars($notification['title']); ?></div>
+                        <div class="notification-message"><?php echo htmlspecialchars($notification['message']); ?></div>
+                        <div class="notification-time"><?php echo formatNotificationTime($notification['created_at']); ?></div>
+                      </div>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </div>
+            <div class="notification-footer">
+              <a href="#">Lihat semua notifikasi</a>
+            </div>
+          </div>
+        </div>
+        
         <div id="userAvatarContainer">
           <?php 
           // Check if user has profile photo
@@ -2229,15 +2474,28 @@ function getRoleName($role_id) {
     document.getElementById('userAvatarContainer').addEventListener('click', function(e) {
       e.stopPropagation();
       document.getElementById('userDropdown').classList.toggle('active');
+      document.getElementById('notificationDropdown').classList.remove('active');
     });
 
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function() {
+    // Notification dropdown toggle
+    document.getElementById('notificationIcon').addEventListener('click', function(e) {
+      e.stopPropagation();
+      document.getElementById('notificationDropdown').classList.toggle('active');
       document.getElementById('userDropdown').classList.remove('active');
     });
 
-    // Prevent dropdown from closing when clicking inside it
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function() {
+      document.getElementById('userDropdown').classList.remove('active');
+      document.getElementById('notificationDropdown').classList.remove('active');
+    });
+
+    // Prevent dropdowns from closing when clicking inside them
     document.getElementById('userDropdown').addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+
+    document.getElementById('notificationDropdown').addEventListener('click', function(e) {
       e.stopPropagation();
     });
 
@@ -2365,6 +2623,42 @@ function getRoleName($role_id) {
     function hideNotification() {
       const notification = document.getElementById('notification');
       notification.style.display = 'none';
+    }
+
+    // Mark all notifications as read
+    function markAllAsRead() {
+      // Remove unread class from all notification items
+      document.querySelectorAll('.notification-item.unread').forEach(item => {
+        item.classList.remove('unread');
+      });
+      
+      // Hide notification badge
+      const badge = document.querySelector('.notification-badge');
+      if (badge) {
+        badge.style.display = 'none';
+      }
+      
+      // Update database via AJAX
+      fetch('api/notifications.php?action=mark_all_read', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: <?php echo $user_id; ?>
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          console.log('All notifications marked as read');
+        }
+      })
+      .catch(error => {
+        console.error('Error marking notifications as read:', error);
+      });
+      
+      return false;
     }
 
     // Search functionality with dynamic content switching
